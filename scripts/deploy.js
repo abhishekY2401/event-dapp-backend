@@ -1,7 +1,7 @@
 /**
  * @file deploy.js
  * @description Deployment script for the Event DApp contracts
- * This script handles the deployment of EventFactory, EventCore, and TicketManager contracts
+ * This script handles the deployment of EventFactory, EventCore, TicketManager, and UserTicketHub contracts
  * and creates a test event. It also includes contract verification on Etherscan.
  */
 
@@ -17,6 +17,7 @@ const hre = require("hardhat");
  * Main deployment function - deploys all contracts and creates a test event
  * This function handles the entire deployment process including:
  * - Deploying EventFactory contract
+ * - Deploying UserTicketHub contract
  * - Creating a test event (which deploys EventCore and TicketManager)
  * - Verifying contracts on Etherscan (if not on local network)
  * - Logging deployment information and contract addresses
@@ -33,6 +34,14 @@ async function main() {
   await eventFactory.waitForDeployment();
   const eventFactoryAddress = await eventFactory.getAddress();
   console.log("EventFactory deployed to:", eventFactoryAddress);
+
+  // Deploy UserTicketHub contract
+  console.log("\nDeploying UserTicketHub...");
+  const UserTicketHub = await hre.ethers.getContractFactory("UserTicketHub");
+  const userTicketHub = await UserTicketHub.deploy(eventFactoryAddress);
+  await userTicketHub.waitForDeployment();
+  const userTicketHubAddress = await userTicketHub.getAddress();
+  console.log("UserTicketHub deployed to:", userTicketHubAddress);
 
   // Create a test event to demonstrate functionality
   console.log("\nCreating test event...");
@@ -73,6 +82,12 @@ async function main() {
       constructorArguments: [],
     });
 
+    // Verify UserTicketHub contract
+    await hre.run("verify:verify", {
+      address: userTicketHubAddress,
+      constructorArguments: [eventFactoryAddress],
+    });
+
     // Verify EventCore contract with constructor arguments
     await hre.run("verify:verify", {
       address: eventContractAddress,
@@ -96,6 +111,7 @@ async function main() {
   console.log("\nDeployment Summary:");
   console.log("------------------");
   console.log("EventFactory:", eventFactoryAddress);
+  console.log("UserTicketHub:", userTicketHubAddress);
   console.log("EventCore:", eventContractAddress);
   console.log("TicketManager:", ticketManagerAddress);
   console.log("\nTest Event Details:");
