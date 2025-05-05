@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+const path = require("path");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -7,17 +8,23 @@ module.exports = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200
-      }
-    }
+        runs: 200,
+      },
+    },
+  },
+  paths: {
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: path.resolve(__dirname, "../frontend/src/abis"), // 💡 output ABIs to frontend
   },
   networks: {
     hardhat: {
       chainId: 31337,
       mining: {
         auto: true,
-        interval: 0
-      }
-    }
-  }
+        interval: 0,
+      },
+    },
+  },
 };
