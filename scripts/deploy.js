@@ -42,6 +42,14 @@ async function main() {
   const userTicketHubAddress = await userTicketHub.getAddress();
   console.log("UserTicketHub deployed to:", userTicketHubAddress);
 
+  // Deploy EventDiscovery contract
+  console.log("\nDeploying EventDiscovery...");
+  const EventDiscovery = await hre.ethers.getContractFactory("EventDiscovery");
+  const eventDiscovery = await EventDiscovery.deploy(eventFactoryAddress);
+  await eventDiscovery.waitForDeployment();
+  const eventDiscoveryAddress = await eventDiscovery.getAddress();
+  console.log("EventDiscovery deployed to:", eventDiscoveryAddress);
+
   // Verify contracts on Etherscan if not on local network
   if (network.name !== "hardhat" && network.name !== "localhost") {
     console.log("\nWaiting for block confirmations...");
@@ -75,7 +83,7 @@ async function main() {
   const addresses = {
     factory: eventFactoryAddress,
     userHub: userTicketHubAddress,
-    discovery: "" // Add EventDiscovery address here if deployed
+    discovery: eventDiscoveryAddress // Add EventDiscovery address here if deployed
   };
   fs.mkdirSync(path.dirname(addressesPath), { recursive: true });
   fs.writeFileSync(addressesPath, JSON.stringify(addresses, null, 2));
