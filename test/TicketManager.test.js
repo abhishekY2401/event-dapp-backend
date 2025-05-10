@@ -23,10 +23,10 @@ describe("TicketManager", function () {
   beforeEach(async function () {
     // Get test accounts
     [organizer, buyer, recipient] = await ethers.getSigners();
-    
-    // Set event date to 1 day from current block timestamp
-    const latestBlock = await ethers.provider.getBlock('latest');
-    eventDate = latestBlock.timestamp + 86400;
+
+    // Set event date to 2 days from now to ensure enough time for tests
+    const currentBlock = await ethers.provider.getBlock("latest");
+    eventDate = currentBlock.timestamp + 172800; // 2 days in seconds
 
     // Deploy EventCore contract
     const EventCore = await ethers.getContractFactory("EventCore");
@@ -48,86 +48,132 @@ describe("TicketManager", function () {
   // Test ticket purchase functionality
   describe("Ticket Purchase", function () {
     it("Should allow buying tickets", async function () {
-      // Buy multiple tickets and verify balance
       const quantity = 2;
-      await ticketManager.connect(buyer).buyTicket(quantity, { value: ticketPrice * BigInt(quantity) });
-      
-      expect(await ticketManager.tickets(buyer.address)).to.equal(quantity);
+
+      await ticketManager.connect(buyer).buyTicket(quantity, {
+        value: ticketPrice * BigInt(quantity),
+      });
+
+      const balance = await ticketManager.getTicketBalance(buyer.address);
+      expect(balance).to.equal(quantity);
     });
 
     it("Should emit TicketsPurchased event", async function () {
-      // Buy ticket and verify event emission
-      const quantity = 1;
-      await expect(ticketManager.connect(buyer).buyTicket(quantity, { value: ticketPrice }))
+      const quantity = 2;
+
+      await expect(
+        ticketManager.connect(buyer).buyTicket(quantity, {
+          value: ticketPrice * BigInt(quantity),
+        })
+      )
         .to.emit(ticketManager, "TicketsPurchased")
         .withArgs(buyer.address, quantity);
     });
 
     it("Should not allow buying tickets with insufficient payment", async function () {
-      // Attempt to buy ticket with less than required payment
+      const quantity = 2;
+
       await expect(
-        ticketManager.connect(buyer).buyTicket(1, { value: ticketPrice - BigInt(1) })
+        ticketManager.connect(buyer).buyTicket(quantity, {
+          value: ticketPrice * BigInt(quantity - 1),
+        })
       ).to.be.revertedWith("Insufficient Ether sent");
     });
 
     it("Should not allow buying tickets after event date", async function () {
       // Fast forward time past event date
-      await ethers.provider.send("evm_increaseTime", [86400 * 2]);
+      await ethers.provider.send("evm_increaseTime", [172800 * 2]); // 4 days
       await ethers.provider.send("evm_mine");
 
-      // Attempt to buy ticket after event date
+      const quantity = 2;
+
       await expect(
-        ticketManager.connect(buyer).buyTicket(1, { value: ticketPrice })
+        ticketManager.connect(buyer).buyTicket(quantity, {
+          value: ticketPrice * BigInt(quantity),
+        })
       ).to.be.revertedWith("Event has already occurred");
     });
   });
 
   // Test ticket transfer functionality
   describe("Ticket Transfer", function () {
-    // Setup: Buy tickets before each transfer test
     beforeEach(async function () {
-      await ticketManager.connect(buyer).buyTicket(2, { value: ticketPrice * BigInt(2) });
+      // Buy some tickets first
+      const quantity = 2;
+
+      await ticketManager.connect(buyer).buyTicket(quantity, {
+        value: ticketPrice * BigInt(quantity),
+      });
     });
 
     it("Should allow transferring tickets", async function () {
-      // Transfer ticket and verify balances
-      const quantity = 1;
-      await ticketManager.connect(buyer).transferTicket(quantity, recipient.address);
-      
-      expect(await ticketManager.tickets(buyer.address)).to.equal(1);
-      expect(await ticketManager.tickets(recipient.address)).to.equal(1);
+      const transferQuantity = 1;
+
+      await ticketManager
+        .connect(buyer)
+        .transferTicket(transferQuantity, recipient.address);
+
+      const buyerBalance = await ticketManager.getTicketBalance(buyer.address);
+      const recipientBalance = await ticketManager.getTicketBalance(
+        recipient.address
+      );
+
+      expect(buyerBalance).to.equal(1);
+      expect(recipientBalance).to.equal(1);
     });
 
     it("Should emit TicketsTransferred event", async function () {
-      // Transfer ticket and verify event emission
-      const quantity = 1;
-      await expect(ticketManager.connect(buyer).transferTicket(quantity, recipient.address))
+      const transferQuantity = 1;
+
+      await expect(
+        ticketManager
+          .connect(buyer)
+          .transferTicket(transferQuantity, recipient.address)
+      )
         .to.emit(ticketManager, "TicketsTransferred")
-        .withArgs(buyer.address, recipient.address, quantity);
+        .withArgs(buyer.address, recipient.address, transferQuantity);
     });
 
     it("Should not allow transferring more tickets than owned", async function () {
-      // Attempt to transfer more tickets than owned
+      const transferQuantity = 3;
+
       await expect(
-        ticketManager.connect(buyer).transferTicket(3, recipient.address)
+        ticketManager
+          .connect(buyer)
+          .transferTicket(transferQuantity, recipient.address)
       ).to.be.revertedWith("Insufficient tickets owned");
     });
 
     it("Should not allow transferring to zero address", async function () {
-      // Attempt to transfer to zero address
+      const transferQuantity = 1;
+
       await expect(
-        ticketManager.connect(buyer).transferTicket(1, ethers.ZeroAddress)
+        ticketManager
+          .connect(buyer)
+          .transferTicket(transferQuantity, ethers.ZeroAddress)
       ).to.be.revertedWith("Cannot transfer to zero address");
     });
 
     it("Should not allow transferring tickets after event date", async function () {
       // Fast forward time past event date
-      await ethers.provider.send("evm_increaseTime", [86400 * 2]);
+      await ethers.provider.send("evm_increaseTime", [172800 * 2]); // 4 days
       await ethers.provider.send("evm_mine");
 
-      // Attempt to transfer ticket after event date
+      // Verify we're past the event date
+      const currentBlock = await ethers.provider.getBlock("latest");
+      expect(currentBlock.timestamp).to.be.greaterThan(eventDate);
+
+      const transferQuantity = 1;
+
+      // First verify the event date in the contract
+      const contractEventDate = await eventCore.date();
+      expect(currentBlock.timestamp).to.be.greaterThan(contractEventDate);
+
+      // Now attempt the transfer
       await expect(
-        ticketManager.connect(buyer).transferTicket(1, recipient.address)
+        ticketManager
+          .connect(buyer)
+          .transferTicket(transferQuantity, recipient.address)
       ).to.be.revertedWith("Event has already occurred");
     });
   });
@@ -135,11 +181,14 @@ describe("TicketManager", function () {
   // Test ticket balance functionality
   describe("Ticket Balance", function () {
     it("Should return correct ticket balance", async function () {
-      // Buy tickets and verify balance
-      const quantity = 3;
-      await ticketManager.connect(buyer).buyTicket(quantity, { value: ticketPrice * BigInt(quantity) });
-      
-      expect(await ticketManager.getTicketBalance(buyer.address)).to.equal(quantity);
+      const quantity = 2;
+
+      await ticketManager.connect(buyer).buyTicket(quantity, {
+        value: ticketPrice * BigInt(quantity),
+      });
+
+      const balance = await ticketManager.getTicketBalance(buyer.address);
+      expect(balance).to.equal(quantity);
     });
   });
-}); 
+});

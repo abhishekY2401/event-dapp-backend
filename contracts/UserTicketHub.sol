@@ -115,7 +115,7 @@ contract UserTicketHub {
     function buyTickets(uint eventId, uint quantity) external payable {
         // get the event contract address
         address eventAddress = eventFactory.getEventContract(eventId);
-        require(eventAddress != address(0), "Event does not exists");
+        require(eventAddress != address(0), "Event does not exist");
 
         // get the event details
         EventCore eventCore = EventCore(payable(eventAddress));

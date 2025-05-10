@@ -16,7 +16,12 @@ contract EventFactory {
     mapping(uint => address) public eventContracts;
 
     //events
-    event EventCreated(uint indexed eventId, address indexed eventContract, address indexed organizer, string name);
+    event EventCreated(
+        uint indexed eventId,
+        address indexed eventContract,
+        address indexed organizer,
+        string name
+    );
 
     constructor() {
         owner = msg.sender;
@@ -33,7 +38,8 @@ contract EventFactory {
 
     function createEvent(
         string calldata name,
-        uint date, uint price,
+        uint date,
+        uint price,
         uint ticketCount
     ) external returns (uint eventId) {
         require(date > block.timestamp, "Event date must be in the future");
@@ -68,7 +74,6 @@ contract EventFactory {
      */
 
     function getEventContract(uint eventId) external view returns (address) {
-        require(eventContracts[eventId] != address(0), "Event does not exist"); 
         return eventContracts[eventId];
     }
 }

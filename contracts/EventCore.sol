@@ -63,14 +63,6 @@ contract EventCore {
     }
 
     /**
-     * @dev Modifier to check if the event is still active
-     */
-    modifier eventActive() {
-        require(block.timestamp < date, "Event has already occurred");
-        _;
-    }
-
-    /**
      * @dev Updates the number of remaining tickets
      * @param quantity The number of tickets to decrease
      * @return success Whether the update was successful
@@ -118,7 +110,7 @@ contract EventCore {
     receive() external payable {
         emit PaymentReceived(msg.sender, msg.value);
         // Forward payment to organizer
-        (bool sent,) = organizer.call{value: msg.value}("");
+        (bool sent, ) = organizer.call{value: msg.value}("");
         require(sent, "Failed to forward payment to organizer");
         emit PaymentForwarded(organizer, msg.value);
     }
