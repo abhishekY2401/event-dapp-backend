@@ -9,7 +9,7 @@ module.exports = {
     sources: "./contracts",
     tests: "./test",
     cache: "./cache",
-    artifacts: path.resolve(__dirname, "../frontend/src/abis"), // 💡 output ABIs to frontend
+    artifacts: path.resolve(__dirname, "../frontend/artifacts"), // 💡 output ABIs to frontend
   },
   networks: {
     hardhat: {
@@ -19,6 +19,9 @@ module.exports = {
         interval: 0,
       },
     },
-    // Add other networks as needed
+    localhost: {
+      url: "http://127.0.0.1:8545",
+      chainId: 1337,
+    }
   },
 };
