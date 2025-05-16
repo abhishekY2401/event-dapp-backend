@@ -163,8 +163,7 @@ contract UserTicketHub {
      * @param to Address to transfer tickets to
      * @param quantity Number of tickets to transfer
      */
-
-    function transferTickets(uint eventId, address to, uint quantity) external {
+    function transferTickets(uint eventId, address to, uint quantity) external payable {
         require(to != address(0), "Cannot transfer to zero address");
         require(
             userTickets[msg.sender][eventId] >= quantity,
@@ -178,8 +177,17 @@ contract UserTicketHub {
         EventCore eventCore = EventCore(payable(eventAddress));
         TicketManager ticketManager = eventCore.ticketManager();
 
+        // Get event details to calculate transfer amount
+        (, , , uint ticketPrice, , ) = eventCore.getEventDetails();
+        uint transferAmount = ticketPrice * quantity;
+
+        // If payment is provided, validate it
+        if (msg.value > 0) {
+            require(msg.value >= transferAmount, "Insufficient payment for transfer");
+        }
+
         // Transfer the tickets using the TicketManager
-        ticketManager.transferTicket(quantity, to);
+        ticketManager.transferTicket{value: msg.value}(quantity, to);
 
         // Update user records
         userTickets[msg.sender][eventId] -= quantity;

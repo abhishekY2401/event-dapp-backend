@@ -131,7 +131,7 @@ describe("TicketManager", function () {
           .transferTicket(transferQuantity, recipient.address)
       )
         .to.emit(ticketManager, "TicketsTransferred")
-        .withArgs(buyer.address, recipient.address, transferQuantity);
+        .withArgs(buyer.address, recipient.address, transferQuantity, 0);
     });
 
     it("Should not allow transferring more tickets than owned", async function () {

@@ -19,7 +19,8 @@ contract TicketManager {
     event TicketsTransferred(
         address indexed from,
         address indexed to,
-        uint quantity
+        uint quantity,
+        uint amount
     );
 
     /**
@@ -59,25 +60,36 @@ contract TicketManager {
     }
 
     /**
-     * @dev Allows a ticket owner to transfer tickets to another address
+     * @dev Allows a recipient to pay and receive tickets from another address
      * @param quantity Number of tickets to transfer
-     * @param to Address to transfer tickets to
+     * @param from Address to transfer tickets from (the current owner)
      */
-    function transferTicket(uint quantity, address to) external {
+    function transferTicket(uint quantity, address from) external payable {
         // Get event details
-        (, , uint eventDate, , , ) = eventCore.getEventDetails();
+        (, , uint eventDate, uint ticketPrice, , ) = eventCore.getEventDetails();
 
         // Validate event date and transfer
         require(block.timestamp < eventDate, "Event has already occurred");
-        require(to != address(0), "Cannot transfer to zero address");
-        require(tickets[msg.sender] >= quantity, "Insufficient tickets owned");
+        require(from != address(0), "Invalid sender address");
+        require(msg.sender != from, "Sender and recipient cannot be the same");
+        require(tickets[from] >= quantity, "Insufficient tickets owned");
+
+        // Calculate the total amount for the transfer
+        uint transferAmount = ticketPrice * quantity;
+
+        // Payment must be exact
+        require(msg.value >= transferAmount, "Insufficient payment for transfer");
+
+        // Transfer the payment to the original ticket owner
+        (bool sent, ) = payable(from).call{value: transferAmount}("");
+        require(sent, "Failed to transfer payment to original owner");
 
         // Update ticket counts
-        tickets[msg.sender] -= quantity;
-        tickets[to] += quantity;
+        tickets[from] -= quantity;
+        tickets[msg.sender] += quantity;
 
-        // Emit event
-        emit TicketsTransferred(msg.sender, to, quantity);
+        // Emit event with payment information
+        emit TicketsTransferred(from, msg.sender, quantity, msg.value);
     }
 
     /**
