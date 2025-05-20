@@ -36,6 +36,9 @@ contract UserTicketHub {
     // user address => eventId => ticketCount
     mapping(address => mapping(uint => uint)) public userTickets;
 
+    // Add a new mapping to track pending transfers
+    mapping(address => mapping(uint => mapping(address => uint))) public pendingTransfers; // from => eventId => to => quantity
+
     // Events
     event UserRegistered(address indexed user, string userName);
     event ProfileUpdated(address indexed user, string userName);
@@ -52,6 +55,12 @@ contract UserTicketHub {
     );
     event EventFavorited(address indexed user, uint indexed eventId);
     event EventUnfavorited(address indexed user, uint indexed eventId);
+    event TransferInitiated(
+        address indexed from,
+        address indexed to,
+        uint indexed eventId,
+        uint quantity
+    );
 
     /**
      * @dev Constructor to initialize the UserTicketHub with EventFactory
@@ -165,6 +174,7 @@ contract UserTicketHub {
      */
     function transferTickets(uint eventId, address to, uint quantity) external payable {
         require(to != address(0), "Cannot transfer to zero address");
+        require(to != msg.sender, "Cannot transfer to yourself");
         require(
             userTickets[msg.sender][eventId] >= quantity,
             "Insufficient tickets owned"
@@ -181,10 +191,8 @@ contract UserTicketHub {
         (, , , uint ticketPrice, , ) = eventCore.getEventDetails();
         uint transferAmount = ticketPrice * quantity;
 
-        // If payment is provided, validate it
-        if (msg.value > 0) {
-            require(msg.value >= transferAmount, "Insufficient payment for transfer");
-        }
+        // Validate payment from recipient
+        require(msg.value >= transferAmount, "Insufficient payment from recipient");
 
         // Transfer the tickets using the TicketManager
         ticketManager.transferTicket{value: msg.value}(quantity, to);
@@ -325,5 +333,85 @@ contract UserTicketHub {
                 break;
             }
         }
+    }
+
+    /**
+     * @dev Initiate a ticket transfer (without payment)
+     * @param eventId ID of the event
+     * @param to Address to transfer tickets to
+     * @param quantity Number of tickets to transfer
+     */
+    function initiateTransfer(uint eventId, address to, uint quantity) external {
+        require(to != address(0), "Cannot transfer to zero address");
+        require(to != msg.sender, "Cannot transfer to yourself");
+        require(
+            userTickets[msg.sender][eventId] >= quantity,
+            "Insufficient tickets owned"
+        );
+
+        // Get the event contract
+        address eventAddress = eventFactory.getEventContract(eventId);
+        require(eventAddress != address(0), "Event does not exist");
+
+        // Store the pending transfer
+        pendingTransfers[msg.sender][eventId][to] = quantity;
+
+        emit TransferInitiated(msg.sender, to, eventId, quantity);
+    }
+
+    /**
+     * @dev Accept and pay for a ticket transfer
+     * @param from Address of the ticket owner
+     * @param eventId ID of the event
+     */
+    function acceptTransfer(address from, uint eventId) external payable {
+        uint quantity = pendingTransfers[from][eventId][msg.sender];
+        require(quantity > 0, "No pending transfer found");
+
+        // Get the event and ticket manager contracts
+        address eventAddress = eventFactory.getEventContract(eventId);
+        require(eventAddress != address(0), "Event does not exist");
+
+        EventCore eventCore = EventCore(payable(eventAddress));
+        TicketManager ticketManager = eventCore.ticketManager();
+
+        // Get event details to calculate transfer amount
+        (, , , uint ticketPrice, , ) = eventCore.getEventDetails();
+        uint transferAmount = ticketPrice * quantity;
+
+        // Validate payment from recipient
+        require(msg.value >= transferAmount, "Insufficient payment from recipient");
+
+        // Transfer the tickets using the TicketManager
+        ticketManager.transferTicket{value: msg.value}(quantity, msg.sender);
+
+        // Update user records
+        userTickets[from][eventId] -= quantity;
+        userTickets[msg.sender][eventId] += quantity;
+
+        userProfiles[from].totalTicketsOwned -= quantity;
+
+        // If recipient is registered, update their total count
+        if (userProfiles[msg.sender].isRegistered) {
+            userProfiles[msg.sender].totalTicketsOwned += quantity;
+            
+            // Add the event to the recipient's attending list if not already there
+            bool eventFound = false;
+            for (uint i = 0; i < userProfiles[msg.sender].attendingEvents.length; i++) {
+                if (userProfiles[msg.sender].attendingEvents[i] == eventId) {
+                    eventFound = true;
+                    break;
+                }
+            }
+
+            if (!eventFound) {
+                userProfiles[msg.sender].attendingEvents.push(eventId);
+            }
+        }
+
+        // Clear the pending transfer
+        delete pendingTransfers[from][eventId][msg.sender];
+
+        emit TicketsTransferred(from, msg.sender, eventId, quantity);
     }
 }

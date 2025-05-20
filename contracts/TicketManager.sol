@@ -78,8 +78,10 @@ contract TicketManager {
         // Calculate the total amount for the transfer
         uint transferAmount = ticketPrice * quantity;
 
-        // Payment must be exact
-        require(msg.value >= transferAmount, "Insufficient payment for transfer");        // Transfer the payment to the event contract (since sender is selling their tickets)
+        // Validate payment from recipient
+        require(msg.value >= transferAmount, "Insufficient payment from recipient");
+
+        // Transfer the payment to the event contract
         (bool sent, ) = payable(address(eventCore)).call{value: transferAmount}("");
         require(sent, "Failed to transfer payment to event contract");
 
