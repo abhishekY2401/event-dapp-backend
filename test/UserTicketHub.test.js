@@ -154,22 +154,34 @@ describe("UserTicketHub", function () {
       // First buy tickets
       const quantity = 2;
       await userTicketHub.connect(user1).buyTickets(0, quantity, { value: ticketPrice * BigInt(quantity) });
-      
-      // Then transfer one ticket
-      await userTicketHub.connect(user1).transferTickets(0, user2.address, 1);
-      
-      expect(await userTicketHub.getUserTicketCount(user1.address, 0)).to.equal(1);
-      expect(await userTicketHub.getUserTicketCount(user2.address, 0)).to.equal(1);
+
+      // Ensure user1 has enough tickets
+      const initialUser1Balance = await userTicketHub.getUserTicketCount(user1.address, 0);
+      expect(initialUser1Balance).to.be.gte(1);      // Then transfer one ticket
+      await userTicketHub.connect(user1).transferTickets(0, user2.address, 1, {
+        value: ticketPrice
+      });      expect(Number(await userTicketHub.getUserTicketCount(user1.address, 0))).to.equal(Number(initialUser1Balance) - 1);
+      expect(Number(await userTicketHub.getUserTicketCount(user2.address, 0))).to.equal(1);
     });
 
     it("Should emit TicketsTransferred event", async function () {
       // First buy tickets
-      await userTicketHub.connect(user1).buyTickets(0, 1, { value: ticketPrice });
-      
-      // Then transfer ticket
-      await expect(userTicketHub.connect(user1).transferTickets(0, user2.address, 1))
+      await userTicketHub.connect(user1).buyTickets(0, 1, { value: ticketPrice });      // Then transfer ticket
+      await expect(userTicketHub.connect(user1).transferTickets(0, user2.address, 1, {
+        value: ticketPrice
+      }))
         .to.emit(userTicketHub, "TicketsTransferred")
         .withArgs(user1.address, user2.address, 0, 1);
+    });
+
+    it("Should not allow transferring to zero address", async function () {
+      // First buy tickets
+      await userTicketHub.connect(user1).buyTickets(0, 1, { value: ticketPrice });
+
+      // Attempt transfer to zero address
+      await expect(
+        userTicketHub.connect(user1).transferTickets(0, ethers.ZeroAddress, 1)
+      ).to.be.revertedWith("Cannot transfer to zero address");
     });
 
     it("Should not allow transferring more tickets than owned", async function () {
@@ -222,4 +234,4 @@ describe("UserTicketHub", function () {
       expect(attendingEvents[0]).to.equal(0);
     });
   });
-}); 
+});

@@ -122,26 +122,20 @@ describe("Event Management System", function () {
       await userTicketHub.connect(user1).buyTickets(eventId, quantity, {
         value: totalPrice,
       });
-    });
-
-    it("Should allow transfer of tickets between users", async function () {
+    });    it("Should allow transfer of tickets between users", async function () {
       const transferQuantity = 1;
+      // We already have tickets from the beforeEach block, no need to buy more
+      const initialBalance = await userTicketHub.getUserTicketCount(user1.address, eventId);
 
       await userTicketHub
         .connect(user1)
-        .transferTickets(eventId, user2.address, transferQuantity);
+        .transferTickets(eventId, user2.address, transferQuantity, {
+          value: ticketPrice * BigInt(transferQuantity)
+        });
 
-      const user1Tickets = await userTicketHub.getUserTicketCount(
-        user1.address,
-        eventId
-      );
-      const user2Tickets = await userTicketHub.getUserTicketCount(
-        user2.address,
-        eventId
-      );
-
-      expect(user1Tickets).to.equal(1);
-      expect(user2Tickets).to.equal(1);
+      const user1Tickets = await userTicketHub.getUserTicketCount(user1.address, eventId);
+      const user2Tickets = await userTicketHub.getUserTicketCount(user2.address, eventId);      expect(Number(user1Tickets)).to.equal(Number(initialBalance) - transferQuantity);
+      expect(Number(user2Tickets)).to.equal(transferQuantity);
     });
   });
 

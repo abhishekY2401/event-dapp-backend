@@ -198,7 +198,7 @@ contract UserTicketHub {
         // If recipient is registered, update their total count
         if (userProfiles[to].isRegistered) {
             userProfiles[to].totalTicketsOwned += quantity;
-
+            
             // Add the event to the recipient's attending list if not already there
             bool eventFound = false;
             for (uint i = 0; i < userProfiles[to].attendingEvents.length; i++) {

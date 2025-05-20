@@ -98,9 +98,8 @@ describe("TicketManager", function () {
   // Test ticket transfer functionality
   describe("Ticket Transfer", function () {
     beforeEach(async function () {
-      // Buy some tickets first
+      // Buy tickets for the buyer first
       const quantity = 2;
-
       await ticketManager.connect(buyer).buyTicket(quantity, {
         value: ticketPrice * BigInt(quantity),
       });
@@ -111,12 +110,12 @@ describe("TicketManager", function () {
 
       await ticketManager
         .connect(buyer)
-        .transferTicket(transferQuantity, recipient.address);
+        .transferTicket(transferQuantity, recipient.address, {
+          value: ticketPrice * BigInt(transferQuantity),
+        });
 
       const buyerBalance = await ticketManager.getTicketBalance(buyer.address);
-      const recipientBalance = await ticketManager.getTicketBalance(
-        recipient.address
-      );
+      const recipientBalance = await ticketManager.getTicketBalance(recipient.address);
 
       expect(buyerBalance).to.equal(1);
       expect(recipientBalance).to.equal(1);
@@ -128,10 +127,12 @@ describe("TicketManager", function () {
       await expect(
         ticketManager
           .connect(buyer)
-          .transferTicket(transferQuantity, recipient.address)
+          .transferTicket(transferQuantity, recipient.address, {
+            value: ticketPrice * BigInt(transferQuantity),
+          })
       )
         .to.emit(ticketManager, "TicketsTransferred")
-        .withArgs(buyer.address, recipient.address, transferQuantity, 0);
+        .withArgs(buyer.address, recipient.address, transferQuantity, ticketPrice * BigInt(transferQuantity));
     });
 
     it("Should not allow transferring more tickets than owned", async function () {
@@ -140,7 +141,9 @@ describe("TicketManager", function () {
       await expect(
         ticketManager
           .connect(buyer)
-          .transferTicket(transferQuantity, recipient.address)
+          .transferTicket(transferQuantity, recipient.address, {
+            value: ticketPrice * BigInt(transferQuantity),
+          })
       ).to.be.revertedWith("Insufficient tickets owned");
     });
 
@@ -150,7 +153,9 @@ describe("TicketManager", function () {
       await expect(
         ticketManager
           .connect(buyer)
-          .transferTicket(transferQuantity, ethers.ZeroAddress)
+          .transferTicket(transferQuantity, ethers.ZeroAddress, {
+            value: ticketPrice * BigInt(transferQuantity),
+          })
       ).to.be.revertedWith("Cannot transfer to zero address");
     });
 
