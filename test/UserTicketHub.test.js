@@ -234,4 +234,132 @@ describe("UserTicketHub", function () {
       expect(attendingEvents[0]).to.equal(0);
     });
   });
+
+  // Test transfer functionality
+  describe("Transfer Operations", function () {
+    beforeEach(async function () {
+      await userTicketHub.connect(user1).registerUser("TestUser", "test@example.com");
+      await userTicketHub.connect(user2).registerUser("TestUser2", "test2@example.com");
+      
+      // Buy tickets for user1
+      const quantity = 2;
+      await userTicketHub.connect(user1).buyTickets(0, quantity, { value: ticketPrice * BigInt(quantity) });
+    });
+
+    it("Should allow initiating a transfer", async function () {
+      const quantity = 1;
+      await userTicketHub.connect(user1).initiateTransfer(0, user2.address, quantity);
+      
+      const pendingQty = await userTicketHub.pendingTransfers(user1.address, 0, user2.address);
+      expect(pendingQty).to.equal(quantity);
+    });
+
+    it("Should emit TransferInitiated event", async function () {
+      const quantity = 1;
+      await expect(userTicketHub.connect(user1).initiateTransfer(0, user2.address, quantity))
+        .to.emit(userTicketHub, "TransferInitiated")
+        .withArgs(user1.address, user2.address, 0, quantity);
+    });
+
+    it("Should not allow initiating transfer to self", async function () {
+      await expect(
+        userTicketHub.connect(user1).initiateTransfer(0, user1.address, 1)
+      ).to.be.revertedWith("Cannot transfer to yourself");
+    });
+
+    it("Should not allow initiating transfer with insufficient tickets", async function () {
+      await expect(
+        userTicketHub.connect(user1).initiateTransfer(0, user2.address, 3)
+      ).to.be.revertedWith("Insufficient tickets owned");
+    });
+
+    it("Should not allow duplicate pending transfers", async function () {
+      await userTicketHub.connect(user1).initiateTransfer(0, user2.address, 1);
+      
+      await expect(
+        userTicketHub.connect(user1).initiateTransfer(0, user2.address, 1)
+      ).to.be.revertedWith("Transfer already initiated");
+    });
+
+    it("Should allow accepting a transfer", async function () {
+      const quantity = 1;
+      await userTicketHub.connect(user1).initiateTransfer(0, user2.address, quantity);
+      
+      await userTicketHub.connect(user2).acceptTransfer(user1.address, 0, {
+        value: ticketPrice * BigInt(quantity)
+      });
+      
+      const user1Tickets = await userTicketHub.getUserTicketCount(user1.address, 0);
+      const user2Tickets = await userTicketHub.getUserTicketCount(user2.address, 0);
+      
+      expect(user1Tickets).to.equal(1); // 2 - 1
+      expect(user2Tickets).to.equal(1);
+    });
+
+    it("Should emit TicketsTransferred event on acceptance", async function () {
+      const quantity = 1;
+      await userTicketHub.connect(user1).initiateTransfer(0, user2.address, quantity);
+      
+      await expect(userTicketHub.connect(user2).acceptTransfer(user1.address, 0, {
+        value: ticketPrice * BigInt(quantity)
+      }))
+        .to.emit(userTicketHub, "TicketsTransferred")
+        .withArgs(user1.address, user2.address, 0, quantity);
+    });
+
+    it("Should not allow accepting non-existent transfer", async function () {
+      await expect(
+        userTicketHub.connect(user2).acceptTransfer(user1.address, 0, {
+          value: ticketPrice
+        })
+      ).to.be.revertedWith("No pending transfer found");
+    });
+
+    it("Should not allow accepting transfer with insufficient payment", async function () {
+      await userTicketHub.connect(user1).initiateTransfer(0, user2.address, 1);
+      
+      await expect(
+        userTicketHub.connect(user2).acceptTransfer(user1.address, 0, {
+          value: ticketPrice / BigInt(2) // Half the required amount
+        })
+      ).to.be.revertedWith("Insufficient payment from recipient");
+    });
+
+    it("Should clear pending transfer after acceptance", async function () {
+      const quantity = 1;
+      await userTicketHub.connect(user1).initiateTransfer(0, user2.address, quantity);
+      
+      await userTicketHub.connect(user2).acceptTransfer(user1.address, 0, {
+        value: ticketPrice * BigInt(quantity)
+      });
+      
+      const pendingQty = await userTicketHub.pendingTransfers(user1.address, 0, user2.address);
+      expect(pendingQty).to.equal(0);
+    });
+
+    it("Should not allow accepting transfer if sender no longer has enough tickets", async function () {
+      // First transfer one ticket to owner to leave user1 with exactly 1 ticket
+      await userTicketHub.connect(user1).transferTickets(0, owner.address, 1, {
+        value: ticketPrice
+      });
+
+      // Initiate transfer of the last ticket
+      await userTicketHub.connect(user1).initiateTransfer(0, user2.address, 1);
+      
+      // Transfer the last ticket to someone else
+      const tx = await userTicketHub.connect(user1).transferTickets(0, owner.address, 1, {
+        value: ticketPrice
+      });
+      
+      // Wait for the transfer transaction to be mined
+      await tx.wait();
+      
+      // Try to accept the pending transfer
+      await expect(
+        userTicketHub.connect(user2).acceptTransfer(user1.address, 0, {
+          value: ticketPrice
+        })
+      ).to.be.revertedWith("Sender no longer has enough tickets");
+    });
+  });
 });

@@ -188,7 +188,8 @@ contract UserTicketHub {
         TicketManager ticketManager = eventCore.ticketManager();
 
         // Get event details to calculate transfer amount
-        (, , , uint ticketPrice, , ) = eventCore.getEventDetails();
+        (, , uint eventDate, uint ticketPrice, , ) = eventCore.getEventDetails();
+        require(block.timestamp < eventDate, "Event has already occurred");
         uint transferAmount = ticketPrice * quantity;
 
         // Validate payment from recipient
@@ -219,6 +220,11 @@ contract UserTicketHub {
             if (!eventFound) {
                 userProfiles[to].attendingEvents.push(eventId);
             }
+        }
+
+        // Remove event from sender's attending list if they no longer have tickets
+        if (userTickets[msg.sender][eventId] == 0) {
+            _removeAttendingEvent(msg.sender, eventId);
         }
 
         emit TicketsTransferred(msg.sender, to, eventId, quantity);
@@ -353,6 +359,23 @@ contract UserTicketHub {
         address eventAddress = eventFactory.getEventContract(eventId);
         require(eventAddress != address(0), "Event does not exist");
 
+        EventCore eventCore = EventCore(payable(eventAddress));
+        TicketManager ticketManager = eventCore.ticketManager();
+
+        // Check if event has already occurred
+        (, , uint eventDate, , , ) = eventCore.getEventDetails();
+        require(block.timestamp < eventDate, "Event has already occurred");
+
+        // Check if there's already a pending transfer in either direction
+        require(
+            pendingTransfers[msg.sender][eventId][to] == 0,
+            "Transfer already initiated"
+        );
+        require(
+            pendingTransfers[to][eventId][msg.sender] == 0,
+            "Recipient has a pending transfer to sender"
+        );
+
         // Store the pending transfer
         pendingTransfers[msg.sender][eventId][to] = quantity;
 
@@ -376,7 +399,17 @@ contract UserTicketHub {
         TicketManager ticketManager = eventCore.ticketManager();
 
         // Get event details to calculate transfer amount
-        (, , , uint ticketPrice, , ) = eventCore.getEventDetails();
+        (, , uint eventDate, uint ticketPrice, , ) = eventCore.getEventDetails();
+        
+        // Check if event has already occurred
+        require(block.timestamp < eventDate, "Event has already occurred");
+
+        // Check if sender still has enough tickets
+        require(
+            userTickets[from][eventId] >= quantity,
+            "Sender no longer has enough tickets"
+        );
+
         uint transferAmount = ticketPrice * quantity;
 
         // Validate payment from recipient
@@ -407,6 +440,11 @@ contract UserTicketHub {
             if (!eventFound) {
                 userProfiles[msg.sender].attendingEvents.push(eventId);
             }
+        }
+
+        // Remove event from sender's attending list if they no longer have tickets
+        if (userTickets[from][eventId] == 0) {
+            _removeAttendingEvent(from, eventId);
         }
 
         // Clear the pending transfer
