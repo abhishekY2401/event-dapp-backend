@@ -1,0 +1,23 @@
+22nd May 2025
+
+🚀 Starting deployment on: sepolia
+✅ EventFactory deployed at: 0x73b65B7f35C8539b6D8a3A5b722a0C640F642234
+✅ EventDiscovery deployed at: 0x2385143931121e9De20d6f6cE91242fA15a336c8
+✅ UserTicketHub deployed at: 0xF1ea9F2771c3B1D1C2Cba963c88A03bea0CB32ed
+📁 Contract addresses saved to frontend.
+⏳ Waiting for 6 block confirmations...
+🔍 Verifying on Etherscan...
+The contract 0x73b65B7f35C8539b6D8a3A5b722a0C640F642234 has already been verified on the block explorer. If you're trying to verify a partially verified contract, please use the --force flag.
+https://sepolia.etherscan.io/address/0x73b65B7f35C8539b6D8a3A5b722a0C640F642234#code
+
+Successfully submitted source code for contract
+contracts/UserTicketHub.sol:UserTicketHub at 0xF1ea9F2771c3B1D1C2Cba963c88A03bea0CB32ed
+for verification on the block explorer. Waiting for verification result...
+
+Successfully verified contract UserTicketHub on the block explorer.
+https://sepolia.etherscan.io/address/0xF1ea9F2771c3B1D1C2Cba963c88A03bea0CB32ed#code
+
+The contract 0x2385143931121e9De20d6f6cE91242fA15a336c8 has already been verified on the block explorer. If you're trying to verify a partially verified contract, please use the --force flag.
+https://sepolia.etherscan.io/address/0x2385143931121e9De20d6f6cE91242fA15a336c8#code
+
+✅ All done!
